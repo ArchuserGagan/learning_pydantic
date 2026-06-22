@@ -1,7 +1,7 @@
 #basic concept of nstd model is inheritance like class under classs, model under model
-
+import json
 from uuid import UUID, uuid4
-from pydantic import BaseModel,ValidationError,Field,EmailStr,HttpUrl,SecretStr, field_validator,model_validator,ValidationInfo,computed_field #computed field means adding in like operations on two fields
+from pydantic import BaseModel,ValidationError,Field,EmailStr,HttpUrl,SecretStr, field_validator,model_validator,ValidationInfo,computed_field,ConfigDict #configdict is used to configure our model more further
 from datetime import UTC, datetime
 from functools import partial
 from typing import Literal,Annotated  #to add constraints,metadata with type current type
@@ -9,7 +9,9 @@ from typing import Literal,Annotated  #to add constraints,metadata with type cur
 #lets create user model , to create a model in pydantic we create a class that inherit from basemodel
 
 class User(BaseModel): #it is mutable and after changing in further code then it wont validate
-    uid : UUID = Field(default_factory=uuid4) #we dont want to put () in end or it will generate only one
+    model_config = ConfigDict(populate_by_name=True, strict=True, extra="allow", validate_assignment=True,frozen=True) #,frozen true will froze all the default value after seting you cant change
+    # ,validate assignment will revalidate will verify through out after assigning in further code extra allow will allow fields that are not defined in uder model  populate by value gonna accept field name and alias, strict = true gonna stop the conversion of int str to int like that
+    uid : UUID = Field(alias = 'id', default_factory=uuid4) #we dont want to put () in end or it will generate only one
     username : Annotated[str, Field(min_length=3,max_length=20)]
     email : EmailStr
     password : SecretStr
@@ -23,7 +25,7 @@ class User(BaseModel): #it is mutable and after changing in further code then it
     website : HttpUrl | None = None
     @field_validator('username') # this is how we make vaidation custom
     @classmethod
-    def validate_username(cls, v: str) -> str:
+    def validate_username(cls, v: str) -> str: 
         if not v.replace('_', '').isalnum():
             raise ValueError('Username must be alphanumeric (underscores allowed)')
         return v.lower()   ##custom validator works  after pydantic basic checking 
@@ -130,39 +132,18 @@ post_data = {
 post = BlogPost.model_validate(post_data)
 
 print(post.model_dump_json(indent=2))
-# try:
-#     registration = UserRegistration(
-#         email="CoreyMSchafer@gmail.com",
-#         password="secret123",
-#         confirm_password="secret456"
-#     )
-# except ValidationError as e:
-#     print(e)
 
+### User Dictionary
+user_data = {
+    "id": "3bc4bf25-1b73-44da-9078-f2bb310c7374",  #here we are passing alias but alias is in code not output
+    "username": "Corey_Schafer",
+    "email": "CoreyMSchafer@gmail.com",
+    "age": 39, #this conversion will stop now cauz of strict if its str
+    "password": "secret123",
+    "notes": "karen",  # this will be extra field and we can also ristrict this too, ignore
+}
 
-
-### Invalid User
-# try:
-#     user = User(
-#         uid=0,
-#         username="cs",
-#         email="CoreyMSchafer@gmail.com",
-#         age=12,
-#     )
-# except ValidationError as e:
-#     print(e)
-
-### Valid User
-# user = User(
-#     username="Coreyms",
-#     email="CoreyMSchafer@gmail.com",
-#     age=39,
-#     password="secret123", #just a warning for hardcoded password
-#     website="coreyms.com", #we didnt have http here so thats why the error
-#     first_name="corey",
-#     last_name="shafer"
-
-
-
-# )
-# print(user.model_dump_json(indent=2))
+user = User.model_validate_json(json.dumps(user_data))  #if we recieving json data from api etc we can manage like this
+# print(user.model_dump_json(indent=2, by_alias=True, exclude= {"password"}))         #by alias = true gonaa provide the alias name in output, exclude will exdlude the specific field
+# print(user.model_dump_json(indent=2, include={"username", "email"}))  #include will include the specific data
+print(user.model_dump_json(indent=2))
